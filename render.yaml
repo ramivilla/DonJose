@@ -1,0 +1,29 @@
+services:
+  # Backend
+  - type: web
+    name: donjose-backend
+    env: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    disk:
+      name: donjose-data
+      mountPath: /data
+      sizeGB: 1
+
+  # Frontend
+  - type: web
+    name: donjose-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: donjose-backend
+          envVarKey: RENDER_EXTERNAL_URL
