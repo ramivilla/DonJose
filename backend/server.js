@@ -20,36 +20,36 @@ app.use(cors());
 app.use(express.json());
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', message: 'Don José API funcionando' });
 });
 
 // DASHBOARD STATS
-app.get('/api/dashboard', (req, res) => {
+app.get('/api/dashboard', async (req, res) => {
   // Total de animales
-  const stockResult = db.exec('SELECT SUM(cantidad) as total FROM stock');
+  const stockResult = await db.exec('SELECT SUM(cantidad) as total FROM stock');
   const totalAnimales = stockResult[0]?.values[0]?.[0] || 0;
 
   // Stock por dueño
-  const stockPorDuenoResult = db.exec('SELECT dueno, SUM(cantidad) as total FROM stock GROUP BY dueno');
+  const stockPorDuenoResult = await db.exec('SELECT dueno, SUM(cantidad) as total FROM stock GROUP BY dueno');
   const stockPorDueno = stockPorDuenoResult[0] ? stockPorDuenoResult[0].values.map(row => ({
     dueno: row[0],
     total: row[1]
   })) : [];
 
   // Futuros cobros (ventas pendientes de cobro)
-  const cobrosResult = db.exec(`
+  const cobrosResult = await  db.exec(`
     SELECT 'terneros' as tipo, fecha_cobro, dueno, precio_total, notas 
     FROM ventas_terneros 
-    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro >= date('now')
+    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro >= CURRENT_DATE
     UNION ALL
     SELECT 'vacas_toros' as tipo, fecha_cobro, dueno, precio_total, notas 
     FROM ventas_vacas_toros 
-    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro >= date('now')
+    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro >= CURRENT_DATE
     UNION ALL
     SELECT 'cereales' as tipo, fecha_cobro, 'Perla' as dueno, valor_final as precio_total, notas 
     FROM ventas_cereales 
-    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro >= date('now')
+    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro >= CURRENT_DATE
     ORDER BY fecha_cobro ASC
   `);
   const futurosCobros = cobrosResult[0] ? cobrosResult[0].values.map(row => ({
@@ -61,14 +61,14 @@ app.get('/api/dashboard', (req, res) => {
   })) : [];
 
   // Futuros pagos (compras pendientes de pago)
-  const pagosResult = db.exec(`
+  const pagosResult = await db.exec(`
     SELECT 'terneros' as tipo, fecha_pago, dueno, precio_total, notas 
     FROM compras_terneros 
-    WHERE fecha_pago IS NOT NULL AND fecha_pago != '' AND fecha_pago >= date('now')
+    WHERE fecha_pago IS NOT NULL AND fecha_pago != '' AND fecha_pago >= CURRENT_DATE
     UNION ALL
     SELECT 'vacas_toros' as tipo, fecha_pago, dueno, precio_total, proveedor as notas 
     FROM compras_vacas_toros 
-    WHERE fecha_pago IS NOT NULL AND fecha_pago != '' AND fecha_pago >= date('now')
+    WHERE fecha_pago IS NOT NULL AND fecha_pago != '' AND fecha_pago >= CURRENT_DATE
     ORDER BY fecha_pago ASC
   `);
   const futurosPagos = pagosResult[0] ? pagosResult[0].values.map(row => ({
@@ -88,8 +88,8 @@ app.get('/api/dashboard', (req, res) => {
 });
 
 // STOCK
-app.get('/api/stock', (req, res) => {
-  const result = db.exec('SELECT * FROM stock ORDER BY dueno, tipo');
+app.get('/api/stock', async (req, res) => {
+  const result = await db.exec('SELECT * FROM stock ORDER BY dueno, tipo');
   const stock = result[0] ? result[0].values.map(row => ({
     id: row[0],
     tipo: row[1],
@@ -100,7 +100,7 @@ app.get('/api/stock', (req, res) => {
   res.json(stock);
 });
 
-app.post('/api/stock', (req, res) => {
+app.post('/api/stock', async (req, res) => {
   const { tipo, dueno, cantidad } = req.body;
   const cantidadNum = parseInt(cantidad);
   db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?', [cantidadNum, tipo, dueno]);
@@ -116,7 +116,7 @@ app.put('/api/stock/ajustar', (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/sistema/reset-total', (req, res) => {
+app.post('/api/sistema/reset-total', async (req, res) => {
   try {
     // Resetear stock a 0
     db.run('UPDATE stock SET cantidad = 0, fecha_actualizacion = date("now")');
@@ -156,11 +156,11 @@ app.post('/api/sistema/reset-total', (req, res) => {
 });
 
 // DELETE endpoints
-app.delete('/api/nacimientos/:id', (req, res) => {
+app.delete('/api/nacimientos/:id', async (req, res) => {
   const { id } = req.params;
   
   // Obtener datos del nacimiento antes de eliminar
-  const result = db.exec('SELECT dueno, machos, hembras FROM nacimientos WHERE id = ?', [id]);
+  const result = await db.exec('SELECT dueno, machos, hembras FROM nacimientos WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const dueno = result[0].values[0][0];
     const machos = result[0].values[0][1];
@@ -168,7 +168,7 @@ app.delete('/api/nacimientos/:id', (req, res) => {
     
     // Verificar stock de terneros
     if (machos > 0) {
-      const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]);
+      const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]);
       const stockActual = stockResult[0]?.values[0]?.[0] || 0;
       
       if (stockActual < machos) {
@@ -181,7 +181,7 @@ app.delete('/api/nacimientos/:id', (req, res) => {
     
     // Verificar stock de terneras
     if (hembras > 0) {
-      const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneras', dueno]);
+      const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneras', dueno]);
       const stockActual = stockResult[0]?.values[0]?.[0] || 0;
       
       if (stockActual < hembras) {
@@ -211,11 +211,11 @@ app.delete('/api/nacimientos/:id', (req, res) => {
   }
 });
 
-app.delete('/api/muertes/:id', (req, res) => {
+app.delete('/api/muertes/:id', async (req, res) => {
   const { id } = req.params;
   
   // Obtener datos de la muerte antes de eliminar
-  const result = db.exec('SELECT tipo_animal, dueno, cantidad FROM muertes WHERE id = ?', [id]);
+  const result = await db.exec('SELECT tipo_animal, dueno, cantidad FROM muertes WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const tipo_animal = result[0].values[0][0];
     const dueno = result[0].values[0][1];
@@ -234,11 +234,11 @@ app.delete('/api/muertes/:id', (req, res) => {
   }
 });
 
-app.delete('/api/ventas-terneros/:id', (req, res) => {
+app.delete('/api/ventas-terneros/:id', async (req, res) => {
   const { id } = req.params;
   
   // Obtener datos de la venta antes de eliminar
-  const result = db.exec('SELECT dueno, cantidad FROM ventas_terneros WHERE id = ?', [id]);
+  const result = await db.exec('SELECT dueno, cantidad FROM ventas_terneros WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const dueno = result[0].values[0][0];
     const cantidad = result[0].values[0][1];
@@ -256,11 +256,11 @@ app.delete('/api/ventas-terneros/:id', (req, res) => {
   }
 });
 
-app.delete('/api/ventas-vacas-toros/:id', (req, res) => {
+app.delete('/api/ventas-vacas-toros/:id', async (req, res) => {
   const { id } = req.params;
   
   // Obtener datos de la venta antes de eliminar
-  const result = db.exec('SELECT tipo, dueno, cantidad FROM ventas_vacas_toros WHERE id = ?', [id]);
+  const result = await db.exec('SELECT tipo, dueno, cantidad FROM ventas_vacas_toros WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const tipo = result[0].values[0][0];
     const dueno = result[0].values[0][1];
@@ -279,17 +279,17 @@ app.delete('/api/ventas-vacas-toros/:id', (req, res) => {
   }
 });
 
-app.delete('/api/compras-terneros/:id', (req, res) => {
+app.delete('/api/compras-terneros/:id', async (req, res) => {
   const { id } = req.params;
   
   // Obtener datos de la compra antes de eliminar
-  const result = db.exec('SELECT dueno, cantidad FROM compras_terneros WHERE id = ?', [id]);
+  const result = await db.exec('SELECT dueno, cantidad FROM compras_terneros WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const dueno = result[0].values[0][0];
     const cantidad = result[0].values[0][1];
     
     // Verificar stock actual
-    const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]);
+    const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]);
     const stockActual = stockResult[0]?.values[0]?.[0] || 0;
     
     if (stockActual < cantidad) {
@@ -312,18 +312,18 @@ app.delete('/api/compras-terneros/:id', (req, res) => {
   }
 });
 
-app.delete('/api/compras-vacas-toros/:id', (req, res) => {
+app.delete('/api/compras-vacas-toros/:id', async (req, res) => {
   const { id } = req.params;
   
   // Obtener datos de la compra antes de eliminar
-  const result = db.exec('SELECT tipo, dueno, cantidad FROM compras_vacas_toros WHERE id = ?', [id]);
+  const result = await db.exec('SELECT tipo, dueno, cantidad FROM compras_vacas_toros WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const tipo = result[0].values[0][0];
     const dueno = result[0].values[0][1];
     const cantidad = result[0].values[0][2];
     
     // Verificar stock actual
-    const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
+    const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
     const stockActual = stockResult[0]?.values[0]?.[0] || 0;
     
     if (stockActual < cantidad) {
@@ -347,8 +347,8 @@ app.delete('/api/compras-vacas-toros/:id', (req, res) => {
 });
 
 // NACIMIENTOS
-app.get('/api/nacimientos', (req, res) => {
-  const result = db.exec('SELECT * FROM nacimientos ORDER BY fecha DESC');
+app.get('/api/nacimientos', async (req, res) => {
+  const result = await db.exec('SELECT * FROM nacimientos ORDER BY fecha DESC');
   const nacimientos = result[0] ? result[0].values.map(row => ({
     id: row[0],
     fecha: row[1],
@@ -360,7 +360,7 @@ app.get('/api/nacimientos', (req, res) => {
   res.json(nacimientos);
 });
 
-app.post('/api/nacimientos', (req, res) => {
+app.post('/api/nacimientos', async (req, res) => {
   const { fecha, dueno, machos, hembras, notas } = req.body;
   
   // Validar que la fecha no sea anterior a hoy
@@ -393,8 +393,8 @@ app.post('/api/nacimientos', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/nacimientos/stats', (req, res) => {
-  const result = db.exec(`
+app.get('/api/nacimientos/stats', async (req, res) => {
+  const result = await db.exec(`
     SELECT 
       strftime('%Y', fecha) as anio,
       SUM(machos) as machos,
@@ -406,7 +406,7 @@ app.get('/api/nacimientos/stats', (req, res) => {
   `);
   
   // Obtener total de vacas actual (suma de todos los dueños)
-  const stockResult = db.exec('SELECT SUM(cantidad) as total FROM stock WHERE tipo = "Vacas"');
+  const stockResult = await db.exec('SELECT SUM(cantidad) as total FROM stock WHERE tipo = "Vacas"');
   const vacasTotales = stockResult[0]?.values[0]?.[0] || 1;
   
   const stats = result[0] ? result[0].values.map(row => ({
@@ -422,8 +422,8 @@ app.get('/api/nacimientos/stats', (req, res) => {
 });
 
 // MUERTES
-app.get('/api/muertes', (req, res) => {
-  const result = db.exec('SELECT * FROM muertes ORDER BY fecha DESC');
+app.get('/api/muertes', async (req, res) => {
+  const result = await db.exec('SELECT * FROM muertes ORDER BY fecha DESC');
   const muertes = result[0] ? result[0].values.map(row => ({
     id: row[0],
     tipo_animal: row[1],
@@ -437,7 +437,7 @@ app.get('/api/muertes', (req, res) => {
   res.json(muertes);
 });
 
-app.post('/api/muertes', (req, res) => {
+app.post('/api/muertes', async (req, res) => {
   const { tipo_animal, dueno, cantidad, causa, es_recien_nacido, fecha } = req.body;
   
   // Validar que la fecha no sea anterior a hoy
@@ -452,7 +452,7 @@ app.post('/api/muertes', (req, res) => {
   const cantidadNum = parseInt(cantidad);
   
   // Verificar stock disponible
-  const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo_animal, dueno]);
+  const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo_animal, dueno]);
   const stockActual = stockResult[0]?.values[0]?.[0] || 0;
   
   if (stockActual < cantidadNum) {
@@ -474,49 +474,60 @@ app.post('/api/muertes', (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/muertes/stats', (req, res) => {
-  const result = db.exec(`
-    SELECT 
-      strftime('%Y', fecha) as anio,
-      SUM(cantidad) as total_muertes,
-      SUM(CASE WHEN es_recien_nacido = 1 THEN cantidad ELSE 0 END) as terneros_recien_nacidos
-    FROM muertes
-    GROUP BY strftime('%Y', fecha)
-    ORDER BY anio DESC
-  `);
-  
-  const stats = result[0] ? result[0].values.map(row => {
-    const anio = row[0];
-    const totalMuertes = row[1];
-    const ternerosRecienNacidos = row[2];
-    
-    // Obtener total de nacimientos del mismo año
-    const nacimientosResult = db.exec(`
-      SELECT SUM(machos + hembras) as total 
-      FROM nacimientos 
-      WHERE strftime('%Y', fecha) = ?
-    `, [anio]);
-    const totalNacimientos = nacimientosResult[0]?.values[0]?.[0] || 0;
-    
-    const porcentajeMuerte = totalNacimientos > 0 
-      ? ((ternerosRecienNacidos / totalNacimientos) * 100).toFixed(1)
-      : '0.0';
-    
-    return {
-      anio,
-      total_muertes: totalMuertes,
-      terneros_recien_nacidos: ternerosRecienNacidos,
-      total_nacimientos: totalNacimientos,
-      porcentaje_muerte_terneros: porcentajeMuerte
-    };
-  }) : [];
-  
-  res.json(stats);
+app.get('/api/muertes/stats', async (req, res) => {
+  try {
+    // 1. Una sola consulta que trae muertes y nacimientos juntos usando subconsultas
+    const result = await db.exec(`
+      SELECT 
+        m.anio,
+        m.total_muertes,
+        m.terneros_recien_nacidos,
+        COALESCE((
+          SELECT SUM(machos + hembras) 
+          FROM nacimientos 
+          WHERE EXTRACT(YEAR FROM fecha)::text = m.anio
+        ), 0) as total_nacimientos
+      FROM (
+        SELECT 
+          EXTRACT(YEAR FROM fecha)::text as anio,
+          SUM(cantidad) as total_muertes,
+          SUM(CASE WHEN es_recien_nacido = 1 THEN cantidad ELSE 0 END) as terneros_recien_nacidos
+        FROM muertes
+        GROUP BY 1
+      ) m
+      ORDER BY m.anio DESC
+    `);
+
+    // 2. Ahora el .map es simple y no necesita 'await' adentro
+    const stats = result[0] ? result[0].values.map(row => {
+      const anio = row[0];
+      const totalMuertes = row[1];
+      const ternerosRecienNacidos = row[2];
+      const totalNacimientos = row[3];
+      
+      const porcentajeMuerte = totalNacimientos > 0 
+        ? ((ternerosRecienNacidos / totalNacimientos) * 100).toFixed(1)
+        : '0.0';
+
+      return {
+        anio,
+        total_muertes: totalMuertes,
+        terneros_recien_nacidos: ternerosRecienNacidos,
+        total_nacimientos: totalNacimientos,
+        porcentaje_muerte_terneros: porcentajeMuerte
+      };
+    }) : [];
+
+    res.json(stats);
+  } catch (error) {
+    console.error('Error en muertes/stats:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // VENTAS TERNEROS
-app.get('/api/ventas-terneros', (req, res) => {
-  const result = db.exec('SELECT id, tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas FROM ventas_terneros ORDER BY fecha_venta DESC');
+app.get('/api/ventas-terneros', async (req, res) => {
+  const result = await db.exec('SELECT id, tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas FROM ventas_terneros ORDER BY fecha_venta DESC');
   const ventas = result[0] ? result[0].values.map(row => ({
     id: row[0],
     tipo: row[1] || 'Terneros',
@@ -532,14 +543,14 @@ app.get('/api/ventas-terneros', (req, res) => {
   res.json(ventas);
 });
 
-app.post('/api/ventas-terneros', (req, res) => {
+app.post('/api/ventas-terneros', async (req, res) => {
   const { tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas } = req.body;
   
   const cantidadNum = parseInt(cantidad);
   const tipoAnimal = tipo || 'Terneros';
   
   // Verificar stock disponible
-  const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipoAnimal, dueno]);
+  const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipoAnimal, dueno]);
   const stockActual = stockResult[0]?.values[0]?.[0] || 0;
   
   if (stockActual < cantidadNum) {
@@ -562,8 +573,8 @@ app.post('/api/ventas-terneros', (req, res) => {
 });
 
 // COMPRAS TERNEROS
-app.get('/api/compras-terneros', (req, res) => {
-  const result = db.exec('SELECT * FROM compras_terneros ORDER BY fecha_compra DESC');
+app.get('/api/compras-terneros', async (req, res) => {
+  const result = await db.exec('SELECT * FROM compras_terneros ORDER BY fecha_compra DESC');
   const compras = result[0] ? result[0].values.map(row => ({
     id: row[0],
     fecha_compra: row[1],
@@ -579,7 +590,7 @@ app.get('/api/compras-terneros', (req, res) => {
   res.json(compras);
 });
 
-app.post('/api/compras-terneros', (req, res) => {
+app.post('/api/compras-terneros', async (req, res) => {
   const { fecha_compra, dueno, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas } = req.body;
   
   const cantidadNum = parseInt(cantidad);
@@ -597,8 +608,8 @@ app.post('/api/compras-terneros', (req, res) => {
 });
 
 // VENTAS VACAS/TOROS
-app.get('/api/ventas-vacas-toros', (req, res) => {
-  const result = db.exec('SELECT id, tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas FROM ventas_vacas_toros ORDER BY fecha_venta DESC');
+app.get('/api/ventas-vacas-toros', async (req, res) => {
+  const result = await db.exec('SELECT id, tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas FROM ventas_vacas_toros ORDER BY fecha_venta DESC');
   const ventas = result[0] ? result[0].values.map(row => ({
     id: row[0],
     tipo: row[1],
@@ -614,13 +625,13 @@ app.get('/api/ventas-vacas-toros', (req, res) => {
   res.json(ventas);
 });
 
-app.post('/api/ventas-vacas-toros', (req, res) => {
+app.post('/api/ventas-vacas-toros', async (req, res) => {
   const { tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas } = req.body;
   
   const cantidadNum = parseInt(cantidad);
   
   // Verificar stock disponible
-  const stockResult = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
+  const stockResult = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
   const stockActual = stockResult[0]?.values[0]?.[0] || 0;
   
   if (stockActual < cantidadNum) {
@@ -643,8 +654,8 @@ app.post('/api/ventas-vacas-toros', (req, res) => {
 });
 
 // COMPRAS VACAS/TOROS
-app.get('/api/compras-vacas-toros', (req, res) => {
-  const result = db.exec('SELECT id, tipo, fecha_compra, dueno, proveedor, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas FROM compras_vacas_toros ORDER BY fecha_compra DESC');
+app.get('/api/compras-vacas-toros', async (req, res) => {
+  const result = await db.exec('SELECT id, tipo, fecha_compra, dueno, proveedor, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas FROM compras_vacas_toros ORDER BY fecha_compra DESC');
   const compras = result[0] ? result[0].values.map(row => ({
     id: row[0],
     tipo: row[1],
@@ -661,7 +672,7 @@ app.get('/api/compras-vacas-toros', (req, res) => {
   res.json(compras);
 });
 
-app.post('/api/compras-vacas-toros', (req, res) => {
+app.post('/api/compras-vacas-toros', async (req, res) => {
   const { tipo, fecha_compra, dueno, proveedor, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas } = req.body;
   
   const cantidadNum = parseInt(cantidad);
@@ -672,7 +683,7 @@ app.post('/api/compras-vacas-toros', (req, res) => {
     [tipo, fecha_compra, dueno, proveedor, cantidadNum, null, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas]);
   
   // Verificar stock antes
-  const stockAntes = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
+  const stockAntes = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
   console.log('Stock antes:', stockAntes[0]?.values[0]?.[0] || 'No encontrado', 'para tipo:', tipo, 'dueno:', dueno);
   
   // Sumar al stock
@@ -680,7 +691,7 @@ app.post('/api/compras-vacas-toros', (req, res) => {
     [cantidadNum, tipo, dueno]);
   
   // Verificar stock después
-  const stockDespues = db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
+  const stockDespues = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
   console.log('Stock después:', stockDespues[0]?.values[0]?.[0] || 'No encontrado');
   
   saveDB();
@@ -688,8 +699,8 @@ app.post('/api/compras-vacas-toros', (req, res) => {
 });
 
 // LOTES
-app.get('/api/lotes', (req, res) => {
-  const result = db.exec('SELECT * FROM lotes ORDER BY nombre');
+app.get('/api/lotes', async (req, res) => {
+  const result = await db.exec('SELECT * FROM lotes ORDER BY nombre');
   const lotes = result[0] ? result[0].values.map(row => ({
     id: row[0],
     nombre: row[1],
@@ -709,9 +720,9 @@ app.put('/api/lotes/:id', (req, res) => {
 });
 
 // ASIGNACIONES DE LOTES
-app.get('/api/lote-asignaciones/:loteId', (req, res) => {
+app.get('/api/lote-asignaciones/:loteId', async (req, res) => {
   const { loteId } = req.params;
-  const result = db.exec('SELECT * FROM lote_asignaciones WHERE lote_id = ? ORDER BY fecha_asignacion DESC', [loteId]);
+  const result = await db.exec('SELECT * FROM lote_asignaciones WHERE lote_id = ? ORDER BY fecha_asignacion DESC', [loteId]);
   const asignaciones = result[0] ? result[0].values.map(row => ({
     id: row[0],
     lote_id: row[1],
@@ -723,11 +734,11 @@ app.get('/api/lote-asignaciones/:loteId', (req, res) => {
   res.json(asignaciones);
 });
 
-app.post('/api/lote-asignaciones', (req, res) => {
+app.post('/api/lote-asignaciones', async (req, res) => {
   const { lote_id, tipo_animal, dueno, cantidad } = req.body;
   
   // Verificar si ya existe una asignación para este tipo y dueño en el lote
-  const existingResult = db.exec(
+  const existingResult = await db.exec(
     'SELECT id, cantidad FROM lote_asignaciones WHERE lote_id = ? AND tipo_animal = ? AND dueno = ?',
     [lote_id, tipo_animal, dueno]
   );
@@ -750,7 +761,7 @@ app.post('/api/lote-asignaciones', (req, res) => {
   res.json({ success: true });
 });
 
-app.delete('/api/lote-asignaciones/:id', (req, res) => {
+app.delete('/api/lote-asignaciones/:id', async (req, res) => {
   const { id } = req.params;
   db.run('DELETE FROM lote_asignaciones WHERE id = ?', [id]);
   saveDB();
@@ -758,59 +769,63 @@ app.delete('/api/lote-asignaciones/:id', (req, res) => {
 });
 
 // MOVER ANIMALES DE UN LOTE A OTRO
-app.post('/api/lote-asignaciones/mover', (req, res) => {
+app.post('/api/lote-asignaciones/mover', async (req, res) => {
   const { lote_origen_id, lote_destino_id } = req.body;
-  
-  // Obtener todas las asignaciones del lote origen
-  const asignacionesResult = db.exec(
-    'SELECT tipo_animal, dueno, cantidad FROM lote_asignaciones WHERE lote_id = ?',
-    [lote_origen_id]
-  );
-  
-  if (asignacionesResult[0] && asignacionesResult[0].values.length > 0) {
-    // Para cada asignación del lote origen
-    asignacionesResult[0].values.forEach(row => {
-      const tipo_animal = row[0];
-      const dueno = row[1];
-      const cantidad = row[2];
-      
-      // Verificar si ya existe en el lote destino
-      const existingResult = db.exec(
-        'SELECT id, cantidad FROM lote_asignaciones WHERE lote_id = ? AND tipo_animal = ? AND dueno = ?',
-        [lote_destino_id, tipo_animal, dueno]
-      );
-      
-      if (existingResult[0] && existingResult[0].values.length > 0) {
-        // Actualizar cantidad en destino
-        const existingId = existingResult[0].values[0][0];
-        const existingCantidad = existingResult[0].values[0][1];
-        db.run('UPDATE lote_asignaciones SET cantidad = ?, fecha_asignacion = date("now") WHERE id = ?',
-          [existingCantidad + cantidad, existingId]);
-      } else {
-        // Crear nueva asignación en destino
-        db.run('INSERT INTO lote_asignaciones (lote_id, tipo_animal, dueno, cantidad) VALUES (?, ?, ?, ?)',
-          [lote_destino_id, tipo_animal, dueno, cantidad]);
+
+  try {
+    // 1. Obtener todas las asignaciones del lote origen
+    const asignacionesResult = await db.exec(
+      'SELECT tipo_animal, dueno, cantidad FROM lote_asignaciones WHERE lote_id = ?',
+      [lote_origen_id]
+    );
+
+    if (asignacionesResult[0] && asignacionesResult[0].values.length > 0) {
+      // 2. CAMBIO CLAVE: Usamos "for...of" en lugar de "forEach" para que funcione el await
+      for (const row of asignacionesResult[0].values) {
+        const tipo_animal = row[0];
+        const dueno = row[1];
+        const cantidad = row[2];
+
+        // Verificar si ya existe en el lote destino
+        const existingResult = await db.exec(
+          'SELECT id, cantidad FROM lote_asignaciones WHERE lote_id = ? AND tipo_animal = ? AND dueno = ?',
+          [lote_destino_id, tipo_animal, dueno]
+        );
+
+        if (existingResult[0] && existingResult[0].values.length > 0) {
+          // Actualizar cantidad en destino
+          const existingId = existingResult[0].values[0][0];
+          const existingCantidad = existingResult[0].values[0][1];
+          // IMPORTANTE: Agregamos await y cambiamos date("now") por CURRENT_DATE
+          await db.run('UPDATE lote_asignaciones SET cantidad = ?, fecha_asignacion = CURRENT_DATE WHERE id = ?',
+            [existingCantidad + cantidad, existingId]);
+        } else {
+          // Crear nueva asignación en destino
+          await db.run('INSERT INTO lote_asignaciones (lote_id, tipo_animal, dueno, cantidad) VALUES (?, ?, ?, ?)',
+            [lote_destino_id, tipo_animal, dueno, cantidad]);
+        }
       }
-    });
-    
-    // Eliminar todas las asignaciones del lote origen
-    db.run('DELETE FROM lote_asignaciones WHERE lote_id = ?', [lote_origen_id]);
-    
-    saveDB();
-    res.json({ success: true, moved: asignacionesResult[0].values.length });
-  } else {
-    res.json({ success: true, moved: 0 });
+
+      // 3. Eliminar todas las asignaciones del lote origen
+      await db.run('DELETE FROM lote_asignaciones WHERE lote_id = ?', [lote_origen_id]);
+
+      res.json({ success: true, moved: asignacionesResult[0].values.length });
+    } else {
+      res.json({ success: true, moved: 0 });
+    }
+  } catch (error) {
+    console.error('Error al mover lote:', error);
+    res.status(500).json({ error: error.message });
   }
 });
-
 // ===== CEREALES =====
 
 // Obtener stock de cereales por año
-app.get('/api/cereales/stock/:ano', (req, res) => {
+app.get('/api/cereales/stock/:ano', async (req, res) => {
   const año = parseInt(req.params.ano);
   
   try {
-    const result = db.exec(`
+    const result = await db.exec(`
       SELECT tipo, kg_disponibles, kg_vendidos, (kg_disponibles - kg_vendidos) as kg_restantes
       FROM stock_cereales 
       WHERE año = ?
@@ -845,11 +860,11 @@ app.get('/api/cereales/stock/:ano', (req, res) => {
 });
 
 // Obtener ventas de cereales por año
-app.get('/api/cereales/ventas/:ano', (req, res) => {
+app.get('/api/cereales/ventas/:ano', async (req, res) => {
   const año = parseInt(req.params.ano);
   
   try {
-    const result = db.exec(`
+    const result = await db.exec(`
       SELECT id, fecha, tipo, kg_vendidos, precio_por_kg, total_vendido, retencion, valor_final, fecha_cobro, notas
       FROM ventas_cereales 
       WHERE año = ?
@@ -877,9 +892,9 @@ app.get('/api/cereales/ventas/:ano', (req, res) => {
 });
 
 // Obtener años disponibles de cereales
-app.get('/api/cereales/anos', (req, res) => {
+app.get('/api/cereales/anos', async (req, res) => {
   try {
-    const result = db.exec(`
+    const result = await db.exec(`
       SELECT DISTINCT año 
       FROM stock_cereales 
       ORDER BY año DESC
@@ -894,7 +909,7 @@ app.get('/api/cereales/anos', (req, res) => {
 });
 
 // Crear venta de cereales
-app.post('/api/cereales/ventas', (req, res) => {
+app.post('/api/cereales/ventas', async (req, res) => {
   const { fecha, tipo, kg_vendidos, precio_por_kg, total_vendido, retencion, valor_final, fecha_cobro, notas } = req.body;
   
   // Validaciones
@@ -920,7 +935,7 @@ app.post('/api/cereales/ventas', (req, res) => {
   
   try {
     // Verificar stock disponible
-    const stockResult = db.exec(`
+    const stockResult = await db.exec(`
       SELECT kg_disponibles, kg_vendidos 
       FROM stock_cereales 
       WHERE año = ? AND tipo = ?
@@ -949,7 +964,7 @@ app.post('/api/cereales/ventas', (req, res) => {
     // Actualizar stock
     db.run(`
       UPDATE stock_cereales 
-      SET kg_vendidos = kg_vendidos + ?, fecha_actualizacion = date('now')
+      SET kg_vendidos = kg_vendidos + ?, fecha_actualizacion = CURRENT_DATE
       WHERE año = ? AND tipo = ?
     `, [kg, año, tipo]);
     
@@ -963,12 +978,12 @@ app.post('/api/cereales/ventas', (req, res) => {
 });
 
 // Eliminar venta de cereales
-app.delete('/api/cereales/ventas/:id', (req, res) => {
+app.delete('/api/cereales/ventas/:id', async (req, res) => {
   const id = parseInt(req.params.id);
   
   try {
     // Obtener datos de la venta antes de eliminar
-    const ventaResult = db.exec('SELECT año, tipo, kg_vendidos FROM ventas_cereales WHERE id = ?', [id]);
+    const ventaResult = await db.exec('SELECT año, tipo, kg_vendidos FROM ventas_cereales WHERE id = ?', [id]);
     
     if (!ventaResult[0] || ventaResult[0].values.length === 0) {
       return res.status(404).json({ error: 'Venta no encontrada' });
@@ -982,7 +997,7 @@ app.delete('/api/cereales/ventas/:id', (req, res) => {
     // Restaurar stock
     db.run(`
       UPDATE stock_cereales 
-      SET kg_vendidos = kg_vendidos - ?, fecha_actualizacion = date('now')
+      SET kg_vendidos = kg_vendidos - ?, fecha_actualizacion = CURRENT_DATE
       WHERE año = ? AND tipo = ?
     `, [kg_vendidos, año, tipo]);
     
