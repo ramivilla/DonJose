@@ -35,24 +35,51 @@ export const initDB = async () => {
   return {
     exec: async (query, params = []) => {
       try {
-        let i = 0;
-        const pgQuery = query.replace(/\?/g, () => { i++; return `$${i}`; })
-                             .replace(/date\('now'\)/gi, 'CURRENT_DATE');
+        // Convertir placeholders ? a $1, $2, etc. correctamente
+        let paramIndex = 0;
+        const pgQuery = query
+          .replace(/\?/g, () => `$${++paramIndex}`)
+          .replace(/date\('now'\)/gi, 'CURRENT_DATE')
+          .replace(/date\("now"\)/gi, 'CURRENT_DATE')
+          .replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP')
+          .replace(/datetime\("now"\)/gi, 'CURRENT_TIMESTAMP');
+        
+        console.log('🔍 Ejecutando exec query:', pgQuery);
+        console.log('📝 Con parámetros:', params);
+        
         const res = await pool.query(pgQuery, params);
-        return [{ values: res.rows.map(row => Object.values(row)) }];
+        
+        // Simular formato SQLite para compatibilidad
+        return [{
+          values: res.rows.map(row => Object.values(row))
+        }];
       } catch (e) {
-        console.error('Error en exec:', e.message);
+        console.error('❌ Error en exec:', e.message);
+        console.error('Query original:', query);
+        console.error('Parámetros:', params);
         return [{ values: [] }];
       }
     },
+    
     run: async (query, params = []) => {
       try {
-        let i = 0;
-        const pgQuery = query.replace(/\?/g, () => { i++; return `$${i}`; })
-                             .replace(/date\('now'\)/gi, 'CURRENT_DATE');
+        // Convertir placeholders ? a $1, $2, etc. correctamente
+        let paramIndex = 0;
+        const pgQuery = query
+          .replace(/\?/g, () => `$${++paramIndex}`)
+          .replace(/date\('now'\)/gi, 'CURRENT_DATE')
+          .replace(/date\("now"\)/gi, 'CURRENT_DATE')
+          .replace(/datetime\('now'\)/gi, 'CURRENT_TIMESTAMP')
+          .replace(/datetime\("now"\)/gi, 'CURRENT_TIMESTAMP');
+        
+        console.log('🔍 Ejecutando run query:', pgQuery);
+        console.log('📝 Con parámetros:', params);
+        
         return await pool.query(pgQuery, params);
       } catch (e) {
-        console.error('Error en run:', e.message);
+        console.error('❌ Error en run:', e.message);
+        console.error('Query original:', query);
+        console.error('Parámetros:', params);
         throw e;
       }
     }
