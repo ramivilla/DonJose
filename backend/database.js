@@ -7,18 +7,17 @@ dotenv.config();
 
 // ESTA LÍNEA ES VITAL: Obliga a Node a usar IPv4 (la red que funciona en Render)
 dns.setDefaultResultOrder('ipv4first'); // <--- AGREGADO 2
-
 const pool = new Pool({
   user: 'postgres',
-  // Usamos la IP directa para evitar errores de DNS y de IPv6
   host: '44.219.1.205', 
   database: 'postgres',
   password: '$4tHWd##V2hkTQ_', 
-  port: 6543,
+  port: 5432,
   ssl: {
     rejectUnauthorized: false
   },
-  connectionTimeoutMillis: 30000, 
+  connectionTimeoutMillis: 30000,
+  keepAlive: true, // <--- AGREGAR ESTO
 });
 
 export const initDB = async () => {
