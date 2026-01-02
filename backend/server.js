@@ -103,15 +103,15 @@ app.get('/api/stock', async (req, res) => {
 app.post('/api/stock', async (req, res) => {
   const { tipo, dueno, cantidad } = req.body;
   const cantidadNum = parseInt(cantidad);
-  db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?', [cantidadNum, tipo, dueno]);
+  await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?', [cantidadNum, tipo, dueno]);
   saveDB();
   res.json({ success: true });
 });
 
-app.put('/api/stock/ajustar', (req, res) => {
+app.put('/api/stock/ajustar', async (req, res) => {
   const { tipo, dueno, cantidad } = req.body;
   const cantidadNum = parseInt(cantidad);
-  db.run('UPDATE stock SET cantidad = ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?', [cantidadNum, tipo, dueno]);
+  await db.run('UPDATE stock SET cantidad = ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?', [cantidadNum, tipo, dueno]);
   saveDB();
   res.json({ success: true });
 });
@@ -119,31 +119,43 @@ app.put('/api/stock/ajustar', (req, res) => {
 app.post('/api/sistema/reset-total', async (req, res) => {
   try {
     // Resetear stock a 0
-    db.run('UPDATE stock SET cantidad = 0, fecha_actualizacion = date("now")');
+    await db.run('UPDATE stock SET cantidad = 0, fecha_actualizacion = CURRENT_TIMESTAMP');
     
     // Borrar todos los registros históricos
-    db.run('DELETE FROM nacimientos');
-    db.run('DELETE FROM muertes');
-    db.run('DELETE FROM ventas_terneros');
-    db.run('DELETE FROM ventas_vacas_toros');
-    db.run('DELETE FROM compras_terneros');
-    db.run('DELETE FROM compras_vacas_toros');
+    await db.run('DELETE FROM nacimientos');
+    await db.run('DELETE FROM muertes');
+    await db.run('DELETE FROM ventas_terneros');
+    await db.run('DELETE FROM ventas_vacas_toros');
+    await db.run('DELETE FROM compras_terneros');
+    await db.run('DELETE FROM compras_vacas_toros');
     
     // Borrar registros de cereales
-    db.run('DELETE FROM ventas_cereales');
-    db.run('DELETE FROM stock_cereales');
+    await db.run('DELETE FROM ventas_cereales');
+    await db.run('DELETE FROM stock_cereales');
     
     // Borrar asignaciones de lotes
-    db.run('DELETE FROM lote_asignaciones');
+    await db.run('DELETE FROM lote_asignaciones');
     
-    // Resetear las secuencias de IDs (opcional)
-    db.run('DELETE FROM sqlite_sequence WHERE name IN ("nacimientos", "muertes", "ventas_terneros", "ventas_vacas_toros", "compras_terneros", "compras_vacas_toros", "ventas_cereales", "stock_cereales", "lote_asignaciones")');
+    // Resetear las secuencias de IDs en PostgreSQL
+    try {
+      await db.run('ALTER SEQUENCE nacimientos_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE muertes_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE ventas_terneros_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE ventas_vacas_toros_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE compras_terneros_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE compras_vacas_toros_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE ventas_cereales_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE stock_cereales_id_seq RESTART WITH 1');
+      await db.run('ALTER SEQUENCE lote_asignaciones_id_seq RESTART WITH 1');
+    } catch (seqError) {
+      console.log('Nota: Algunas secuencias pueden no existir aún:', seqError.message);
+    }
     
     // Reinicializar stock de cereales para el año actual
     const añoActual = new Date().getFullYear();
-    db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
+    await db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
            [añoActual, 'Blanco', 223600, 0]);
-    db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
+    await db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
            [añoActual, 'Negro', 51600, 0]);
     
     saveDB();
@@ -194,16 +206,16 @@ app.delete('/api/nacimientos/:id', async (req, res) => {
     
     // Restar del stock
     if (machos > 0) {
-      db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+      await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
         [machos, 'Terneros', dueno]);
     }
     if (hembras > 0) {
-      db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+      await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
         [hembras, 'Terneras', dueno]);
     }
     
     // Eliminar registro
-    db.run('DELETE FROM nacimientos WHERE id = ?', [id]);
+    await db.run('DELETE FROM nacimientos WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
   } else {
@@ -222,11 +234,11 @@ app.delete('/api/muertes/:id', async (req, res) => {
     const cantidad = result[0].values[0][2];
     
     // Devolver al stock
-    db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, tipo_animal, dueno]);
     
     // Eliminar registro
-    db.run('DELETE FROM muertes WHERE id = ?', [id]);
+    await db.run('DELETE FROM muertes WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
   } else {
@@ -244,11 +256,11 @@ app.delete('/api/ventas-terneros/:id', async (req, res) => {
     const cantidad = result[0].values[0][1];
     
     // Devolver al stock
-    db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, 'Terneros', dueno]);
     
     // Eliminar registro
-    db.run('DELETE FROM ventas_terneros WHERE id = ?', [id]);
+    await db.run('DELETE FROM ventas_terneros WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
   } else {
@@ -267,11 +279,11 @@ app.delete('/api/ventas-vacas-toros/:id', async (req, res) => {
     const cantidad = result[0].values[0][2];
     
     // Devolver al stock
-    db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, tipo, dueno]);
     
     // Eliminar registro
-    db.run('DELETE FROM ventas_vacas_toros WHERE id = ?', [id]);
+    await db.run('DELETE FROM ventas_vacas_toros WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
   } else {
@@ -300,11 +312,11 @@ app.delete('/api/compras-terneros/:id', async (req, res) => {
     }
     
     // Restar del stock
-    db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, 'Terneros', dueno]);
     
     // Eliminar registro
-    db.run('DELETE FROM compras_terneros WHERE id = ?', [id]);
+    await db.run('DELETE FROM compras_terneros WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
   } else {
@@ -334,11 +346,11 @@ app.delete('/api/compras-vacas-toros/:id', async (req, res) => {
     }
     
     // Restar del stock
-    db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, tipo, dueno]);
     
     // Eliminar registro
-    db.run('DELETE FROM compras_vacas_toros WHERE id = ?', [id]);
+    await db.run('DELETE FROM compras_vacas_toros WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
   } else {
@@ -376,16 +388,16 @@ app.post('/api/nacimientos', async (req, res) => {
   const hembrasNum = parseInt(hembras) || 0;
   
   // Insertar nacimiento
-  db.run('INSERT INTO nacimientos (fecha, dueno, machos, hembras, notas) VALUES (?, ?, ?, ?, ?)',
+  await db.run('INSERT INTO nacimientos (fecha, dueno, machos, hembras, notas) VALUES (?, ?, ?, ?, ?)',
     [fecha, dueno, machosNum, hembrasNum, notas]);
   
   // Actualizar stock automáticamente
   if (machosNum > 0) {
-    db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [machosNum, 'Terneros', dueno]);
   }
   if (hembrasNum > 0) {
-    db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+    await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [hembrasNum, 'Terneras', dueno]);
   }
   
@@ -463,11 +475,11 @@ app.post('/api/muertes', async (req, res) => {
   }
   
   // Insertar muerte (sexo se deja como NULL o vacío ya que no se usa)
-  db.run('INSERT INTO muertes (tipo_animal, sexo, dueno, cantidad, causa, es_recien_nacido, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  await db.run('INSERT INTO muertes (tipo_animal, sexo, dueno, cantidad, causa, es_recien_nacido, fecha) VALUES (?, ?, ?, ?, ?, ?, ?)',
     [tipo_animal, '', dueno, cantidadNum, causa, es_recien_nacido ? 1 : 0, fecha]);
   
   // Restar del stock
-  db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+  await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipo_animal, dueno]);
   
   saveDB();
@@ -561,11 +573,11 @@ app.post('/api/ventas-terneros', async (req, res) => {
   }
   
   // Insertar venta
-  db.run('INSERT INTO ventas_terneros (tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  await db.run('INSERT INTO ventas_terneros (tipo, fecha_venta, dueno, cantidad, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [tipoAnimal, fecha_venta, dueno, cantidadNum, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas]);
   
   // Restar del stock
-  db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+  await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipoAnimal, dueno]);
   
   saveDB();
@@ -596,11 +608,11 @@ app.post('/api/compras-terneros', async (req, res) => {
   const cantidadNum = parseInt(cantidad);
   
   // Insertar compra
-  db.run('INSERT INTO compras_terneros (fecha_compra, dueno, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  await db.run('INSERT INTO compras_terneros (fecha_compra, dueno, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [fecha_compra, dueno, cantidadNum, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas]);
   
   // Sumar al stock de Terneros
-  db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+  await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, 'Terneros', dueno]);
   
   saveDB();
@@ -642,11 +654,11 @@ app.post('/api/ventas-vacas-toros', async (req, res) => {
   }
   
   // Insertar venta (kilos_por_animal se deja como NULL)
-  db.run('INSERT INTO ventas_vacas_toros (tipo, fecha_venta, dueno, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  await db.run('INSERT INTO ventas_vacas_toros (tipo, fecha_venta, dueno, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [tipo, fecha_venta, dueno, cantidadNum, null, kilos_totales, precio_por_kg, precio_total, fecha_cobro, notas]);
   
   // Restar del stock
-  db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+  await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipo, dueno]);
   
   saveDB();
@@ -679,7 +691,7 @@ app.post('/api/compras-vacas-toros', async (req, res) => {
   console.log('Compra recibida:', { tipo, dueno, cantidad: cantidadNum });
   
   // Insertar compra (kilos_por_animal se deja como NULL)
-  db.run('INSERT INTO compras_vacas_toros (tipo, fecha_compra, dueno, proveedor, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  await db.run('INSERT INTO compras_vacas_toros (tipo, fecha_compra, dueno, proveedor, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [tipo, fecha_compra, dueno, proveedor, cantidadNum, null, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas]);
   
   // Verificar stock antes
@@ -687,7 +699,7 @@ app.post('/api/compras-vacas-toros', async (req, res) => {
   console.log('Stock antes:', stockAntes[0]?.values[0]?.[0] || 'No encontrado', 'para tipo:', tipo, 'dueno:', dueno);
   
   // Sumar al stock
-  db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = date("now") WHERE tipo = ? AND dueno = ?',
+  await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipo, dueno]);
   
   // Verificar stock después
@@ -711,10 +723,10 @@ app.get('/api/lotes', async (req, res) => {
   res.json(lotes);
 });
 
-app.put('/api/lotes/:id', (req, res) => {
+app.put('/api/lotes/:id', async (req, res) => {
   const { id } = req.params;
   const { notas } = req.body;
-  db.run('UPDATE lotes SET notas = ?, fecha_actualizacion = date("now") WHERE id = ?', [notas, id]);
+  await db.run('UPDATE lotes SET notas = ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE id = ?', [notas, id]);
   saveDB();
   res.json({ success: true });
 });
@@ -749,11 +761,11 @@ app.post('/api/lote-asignaciones', async (req, res) => {
     const existingCantidad = existingResult[0].values[0][1];
     const nuevaCantidad = existingCantidad + cantidad;
     
-    db.run('UPDATE lote_asignaciones SET cantidad = ?, fecha_asignacion = date("now") WHERE id = ?',
+    await db.run('UPDATE lote_asignaciones SET cantidad = ?, fecha_asignacion = CURRENT_DATE WHERE id = ?',
       [nuevaCantidad, existingId]);
   } else {
     // Crear nueva asignación
-    db.run('INSERT INTO lote_asignaciones (lote_id, tipo_animal, dueno, cantidad) VALUES (?, ?, ?, ?)',
+    await db.run('INSERT INTO lote_asignaciones (lote_id, tipo_animal, dueno, cantidad) VALUES (?, ?, ?, ?)',
       [lote_id, tipo_animal, dueno, cantidad]);
   }
   
@@ -763,7 +775,7 @@ app.post('/api/lote-asignaciones', async (req, res) => {
 
 app.delete('/api/lote-asignaciones/:id', async (req, res) => {
   const { id } = req.params;
-  db.run('DELETE FROM lote_asignaciones WHERE id = ?', [id]);
+  await db.run('DELETE FROM lote_asignaciones WHERE id = ?', [id]);
   saveDB();
   res.json({ success: true });
 });
@@ -796,7 +808,7 @@ app.post('/api/lote-asignaciones/mover', async (req, res) => {
           // Actualizar cantidad en destino
           const existingId = existingResult[0].values[0][0];
           const existingCantidad = existingResult[0].values[0][1];
-          // IMPORTANTE: Agregamos await y cambiamos date("now") por CURRENT_DATE
+          // IMPORTANTE: Agregamos await y cambiamos CURRENT_DATE por CURRENT_DATE
           await db.run('UPDATE lote_asignaciones SET cantidad = ?, fecha_asignacion = CURRENT_DATE WHERE id = ?',
             [existingCantidad + cantidad, existingId]);
         } else {
@@ -842,9 +854,9 @@ app.get('/api/cereales/stock/:ano', async (req, res) => {
       res.json(stock);
     } else {
       // Si no existe stock para ese año, crear con valores por defecto
-      db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
+      await db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
              [año, 'Blanco', 223600, 0]);
-      db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
+      await db.run('INSERT INTO stock_cereales (año, tipo, kg_disponibles, kg_vendidos) VALUES (?, ?, ?, ?)', 
              [año, 'Negro', 51600, 0]);
       saveDB();
       
@@ -956,15 +968,15 @@ app.post('/api/cereales/ventas', async (req, res) => {
     
     // Usar valores calculados del frontend
     // Insertar venta
-    db.run(`
+    await db.run(`
       INSERT INTO ventas_cereales (fecha, año, tipo, kg_vendidos, precio_por_kg, total_vendido, retencion, valor_final, fecha_cobro, notas)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [fecha, año, tipo, kg, precio, totalVendido, retencionVal, valorFinal, fecha_cobro || null, notas || '']);
     
     // Actualizar stock
-    db.run(`
+    await db.run(`
       UPDATE stock_cereales 
-      SET kg_vendidos = kg_vendidos + ?, fecha_actualizacion = CURRENT_DATE
+      SET kg_vendidos = kg_vendidos + ?, fecha_actualizacion = CURRENT_TIMESTAMP
       WHERE año = ? AND tipo = ?
     `, [kg, año, tipo]);
     
@@ -992,12 +1004,12 @@ app.delete('/api/cereales/ventas/:id', async (req, res) => {
     const [año, tipo, kg_vendidos] = ventaResult[0].values[0];
     
     // Eliminar venta
-    db.run('DELETE FROM ventas_cereales WHERE id = ?', [id]);
+    await db.run('DELETE FROM ventas_cereales WHERE id = ?', [id]);
     
     // Restaurar stock
-    db.run(`
+    await db.run(`
       UPDATE stock_cereales 
-      SET kg_vendidos = kg_vendidos - ?, fecha_actualizacion = CURRENT_DATE
+      SET kg_vendidos = kg_vendidos - ?, fecha_actualizacion = CURRENT_TIMESTAMP
       WHERE año = ? AND tipo = ?
     `, [kg_vendidos, año, tipo]);
     
