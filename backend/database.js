@@ -1,15 +1,18 @@
 import pg from 'pg';
 const { Pool } = pg;
 import dotenv from 'dotenv';
+import dns from 'node:dns';
 
 dotenv.config();
+
+// ESTA LÍNEA ES LA CLAVE: Fuerza a Node a usar IPv4 primero
+dns.setDefaultResultOrder('ipv4first');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false
   },
-  // Esto obliga a la conexión a ser más paciente y estable
   connectionTimeoutMillis: 10000, 
 });
 
