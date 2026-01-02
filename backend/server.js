@@ -37,17 +37,17 @@ app.get('/api/dashboard', async (req, res) => {
     total: row[1]
   })) : [];
 
-  // Futuros cobros (ventas pendientes de cobro) - Versión segura para PostgreSQL
+  // Futuros cobros (ventas pendientes de cobro) - Con formato de fecha legible
   const cobrosResult = await  db.exec(`
-    SELECT 'terneros' as tipo, fecha_cobro, dueno, precio_total, notas 
+    SELECT 'terneros' as tipo, TO_CHAR(fecha_cobro, 'DD/MM/YYYY') as fecha_cobro, dueno, precio_total, notas 
     FROM ventas_terneros 
     WHERE fecha_cobro IS NOT NULL AND fecha_cobro >= CURRENT_DATE
     UNION ALL
-    SELECT 'vacas_toros' as tipo, fecha_cobro, dueno, precio_total, notas 
+    SELECT 'vacas_toros' as tipo, TO_CHAR(fecha_cobro, 'DD/MM/YYYY') as fecha_cobro, dueno, precio_total, notas 
     FROM ventas_vacas_toros 
     WHERE fecha_cobro IS NOT NULL AND fecha_cobro >= CURRENT_DATE
     UNION ALL
-    SELECT 'cereales' as tipo, fecha_cobro, 'Perla' as dueno, valor_final as precio_total, notas 
+    SELECT 'cereales' as tipo, TO_CHAR(fecha_cobro, 'DD/MM/YYYY') as fecha_cobro, 'Perla' as dueno, valor_final as precio_total, notas 
     FROM ventas_cereales 
     WHERE fecha_cobro IS NOT NULL AND fecha_cobro >= CURRENT_DATE
     ORDER BY fecha_cobro ASC
@@ -60,13 +60,13 @@ app.get('/api/dashboard', async (req, res) => {
     notas: row[4]
   })) : [];
 
-  // Futuros pagos (compras pendientes de pago) - Versión segura para PostgreSQL
+  // Futuros pagos (compras pendientes de pago) - Con formato de fecha legible
   const pagosResult = await db.exec(`
-    SELECT 'terneros' as tipo, fecha_pago, dueno, precio_total, notas 
+    SELECT 'terneros' as tipo, TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_pago, dueno, precio_total, notas 
     FROM compras_terneros 
     WHERE fecha_pago IS NOT NULL AND fecha_pago >= CURRENT_DATE
     UNION ALL
-    SELECT 'vacas_toros' as tipo, fecha_pago, dueno, precio_total, proveedor as notas 
+    SELECT 'vacas_toros' as tipo, TO_CHAR(fecha_pago, 'DD/MM/YYYY') as fecha_pago, dueno, precio_total, proveedor as notas 
     FROM compras_vacas_toros 
     WHERE fecha_pago IS NOT NULL AND fecha_pago >= CURRENT_DATE
     ORDER BY fecha_pago ASC
