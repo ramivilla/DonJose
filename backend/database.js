@@ -7,8 +7,10 @@ dotenv.config();
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false // Esto permite la conexión segura con Supabase
-  }
+    rejectUnauthorized: false
+  },
+  // Esto obliga a la conexión a ser más paciente y estable
+  connectionTimeoutMillis: 10000, 
 });
 
 export const initDB = async () => {
