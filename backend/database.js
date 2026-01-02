@@ -1,40 +1,39 @@
 import pg from 'pg';
 const { Pool } = pg;
 import dotenv from 'dotenv';
-import dns from 'node:dns';
 
 dotenv.config();
 
-// ESTA LÍNEA ES LA CLAVE: Fuerza a Node a usar IPv4 primero
-dns.setDefaultResultOrder('ipv4first');
-
+// CONFIGURACIÓN MANUAL (Más robusta)
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  user: 'postgres',
+  host: 'db.rgaibdgnjaimsszmizor.supabase.co',
+  database: 'postgres',
+  password: '$4tHWd##V2hkTQ_', // ACÁ PONEMOS LA CLAVE REAL CON LOS #
+  port: 6543,
   ssl: {
     rejectUnauthorized: false
   },
-  connectionTimeoutMillis: 10000, 
+  connectionTimeoutMillis: 30000, // 30 segundos
 });
 
 export const initDB = async () => {
   try {
-    await pool.query('SELECT NOW()');
-    console.log('✅ Conexión con Supabase establecida');
+    console.log('Intentando conectar a Supabase...');
+    const client = await pool.connect();
+    console.log('✅ Conexión con Supabase establecida correctamente');
+    client.release(); // Devolvemos la conexión al pool
   } catch (err) {
-    console.error('❌ Error de conexión:', err.message);
+    console.error('❌ Error crítico de conexión:', err.message);
   }
 
   return {
     exec: async (query, params = []) => {
-      // Traducir '?' de SQLite a '$1, $2...' de Postgres
       let i = 0;
       const pgQuery = query.replace(/\?/g, () => { i++; return `$${i}`; })
-                           .replace(/date\('now'\)/gi, 'CURRENT_DATE'); // Traducción de fecha
-      
+                           .replace(/date\('now'\)/gi, 'CURRENT_DATE');
       const res = await pool.query(pgQuery, params);
-      return [{ 
-        values: res.rows.map(row => Object.values(row)) 
-      }];
+      return [{ values: res.rows.map(row => Object.values(row)) }];
     },
     run: async (query, params = []) => {
       let i = 0;
@@ -45,5 +44,5 @@ export const initDB = async () => {
   };
 };
 
-export const saveDB = () => true; 
+export const saveDB = () => true;
 export default { initDB, saveDB };
