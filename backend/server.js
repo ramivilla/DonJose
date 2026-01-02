@@ -37,11 +37,47 @@ app.get('/api/dashboard', async (req, res) => {
     total: row[1]
   })) : [];
 
-  // Futuros cobros (temporalmente deshabilitado por problema de fechas)
-  const futurosCobros = [];
-  
-  // Futuros pagos (temporalmente deshabilitado por problema de fechas)  
-  const futurosPagos = [];
+  // Futuros cobros (ventas pendientes de cobro) - Versión segura para PostgreSQL
+  const cobrosResult = await  db.exec(`
+    SELECT 'terneros' as tipo, fecha_cobro, dueno, precio_total, notas 
+    FROM ventas_terneros 
+    WHERE fecha_cobro IS NOT NULL AND fecha_cobro >= CURRENT_DATE
+    UNION ALL
+    SELECT 'vacas_toros' as tipo, fecha_cobro, dueno, precio_total, notas 
+    FROM ventas_vacas_toros 
+    WHERE fecha_cobro IS NOT NULL AND fecha_cobro >= CURRENT_DATE
+    UNION ALL
+    SELECT 'cereales' as tipo, fecha_cobro, 'Perla' as dueno, valor_final as precio_total, notas 
+    FROM ventas_cereales 
+    WHERE fecha_cobro IS NOT NULL AND fecha_cobro >= CURRENT_DATE
+    ORDER BY fecha_cobro ASC
+  `);
+  const futurosCobros = cobrosResult[0] ? cobrosResult[0].values.map(row => ({
+    tipo: row[0],
+    fecha_cobro: row[1],
+    dueno: row[2],
+    precio_total: row[3],
+    notas: row[4]
+  })) : [];
+
+  // Futuros pagos (compras pendientes de pago) - Versión segura para PostgreSQL
+  const pagosResult = await db.exec(`
+    SELECT 'terneros' as tipo, fecha_pago, dueno, precio_total, notas 
+    FROM compras_terneros 
+    WHERE fecha_pago IS NOT NULL AND fecha_pago >= CURRENT_DATE
+    UNION ALL
+    SELECT 'vacas_toros' as tipo, fecha_pago, dueno, precio_total, proveedor as notas 
+    FROM compras_vacas_toros 
+    WHERE fecha_pago IS NOT NULL AND fecha_pago >= CURRENT_DATE
+    ORDER BY fecha_pago ASC
+  `);
+  const futurosPagos = pagosResult[0] ? pagosResult[0].values.map(row => ({
+    tipo: row[0],
+    fecha_pago: row[1],
+    dueno: row[2],
+    precio_total: row[3],
+    notas: row[4]
+  })) : [];
 
   res.json({
     totalAnimales,
