@@ -1,3 +1,24 @@
+import pg from 'pg';
+const { Pool } = pg;
+import dotenv from 'dotenv';
+
+// Forzamos la carga de variables de entorno
+dotenv.config();
+
+// Verificación de seguridad antes de intentar conectar
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error("❌ ERROR CRÍTICO: La variable DATABASE_URL no está definida en el sistema.");
+}
+
+const pool = new Pool({
+  connectionString: connectionString,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
 export const initDB = async () => {
   console.log('Iniciando conexión con PostgreSQL...');
   try {
@@ -31,3 +52,8 @@ export const initDB = async () => {
     }
   };
 };
+
+export const saveDB = () => true;
+
+export { pool }; // Por si lo necesitas en otros archivos
+export default { initDB, saveDB };
