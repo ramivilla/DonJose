@@ -41,15 +41,24 @@ app.get('/api/dashboard', async (req, res) => {
   const cobrosResult = await  db.exec(`
     SELECT 'terneros' as tipo, fecha_cobro, dueno, precio_total, notas 
     FROM ventas_terneros 
-    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro::date >= CURRENT_DATE
+    WHERE fecha_cobro IS NOT NULL 
+      AND fecha_cobro != '' 
+      AND fecha_cobro ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      AND fecha_cobro::date >= CURRENT_DATE
     UNION ALL
     SELECT 'vacas_toros' as tipo, fecha_cobro, dueno, precio_total, notas 
     FROM ventas_vacas_toros 
-    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro::date >= CURRENT_DATE
+    WHERE fecha_cobro IS NOT NULL 
+      AND fecha_cobro != '' 
+      AND fecha_cobro ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      AND fecha_cobro::date >= CURRENT_DATE
     UNION ALL
     SELECT 'cereales' as tipo, fecha_cobro, 'Perla' as dueno, valor_final as precio_total, notas 
     FROM ventas_cereales 
-    WHERE fecha_cobro IS NOT NULL AND fecha_cobro != '' AND fecha_cobro::date >= CURRENT_DATE
+    WHERE fecha_cobro IS NOT NULL 
+      AND fecha_cobro != '' 
+      AND fecha_cobro ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      AND fecha_cobro::date >= CURRENT_DATE
     ORDER BY fecha_cobro ASC
   `);
   const futurosCobros = cobrosResult[0] ? cobrosResult[0].values.map(row => ({
@@ -64,11 +73,17 @@ app.get('/api/dashboard', async (req, res) => {
   const pagosResult = await db.exec(`
     SELECT 'terneros' as tipo, fecha_pago, dueno, precio_total, notas 
     FROM compras_terneros 
-    WHERE fecha_pago IS NOT NULL AND fecha_pago != '' AND fecha_pago::date >= CURRENT_DATE
+    WHERE fecha_pago IS NOT NULL 
+      AND fecha_pago != '' 
+      AND fecha_pago ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      AND fecha_pago::date >= CURRENT_DATE
     UNION ALL
     SELECT 'vacas_toros' as tipo, fecha_pago, dueno, precio_total, proveedor as notas 
     FROM compras_vacas_toros 
-    WHERE fecha_pago IS NOT NULL AND fecha_pago != '' AND fecha_pago::date >= CURRENT_DATE
+    WHERE fecha_pago IS NOT NULL 
+      AND fecha_pago != '' 
+      AND fecha_pago ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+      AND fecha_pago::date >= CURRENT_DATE
     ORDER BY fecha_pago ASC
   `);
   const futurosPagos = pagosResult[0] ? pagosResult[0].values.map(row => ({
