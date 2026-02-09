@@ -378,7 +378,6 @@ function VentasCereales() {
             type="date" 
             value={form.fecha}
             onChange={(e) => setForm({...form, fecha: e.target.value})}
-            min={new Date().toISOString().split('T')[0]}
             required
           />
         </div>
