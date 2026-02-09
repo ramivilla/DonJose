@@ -375,15 +375,6 @@ app.get('/api/nacimientos', async (req, res) => {
 app.post('/api/nacimientos', async (req, res) => {
   const { fecha, dueno, machos, hembras, notas } = req.body;
   
-  // Validar que la fecha no sea anterior a hoy
-  const fechaHoy = new Date().toISOString().split('T')[0];
-  if (fecha < fechaHoy) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'No se pueden registrar nacimientos en fechas pasadas. Solo desde hoy en adelante.' 
-    });
-  }
-  
   const machosNum = parseInt(machos) || 0;
   const hembrasNum = parseInt(hembras) || 0;
   
@@ -451,15 +442,6 @@ app.get('/api/muertes', async (req, res) => {
 
 app.post('/api/muertes', async (req, res) => {
   const { tipo_animal, dueno, cantidad, causa, es_recien_nacido, fecha } = req.body;
-  
-  // Validar que la fecha no sea anterior a hoy
-  const fechaHoy = new Date().toISOString().split('T')[0];
-  if (fecha < fechaHoy) {
-    return res.status(400).json({ 
-      success: false, 
-      error: 'No se pueden registrar muertes en fechas pasadas. Solo desde hoy en adelante.' 
-    });
-  }
   
   const cantidadNum = parseInt(cantidad);
   

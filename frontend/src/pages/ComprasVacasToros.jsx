@@ -130,7 +130,6 @@ function ComprasVacasToros() {
             type="date" 
             value={form.fecha_compra}
             onChange={(e) => setForm({...form, fecha_compra: e.target.value})}
-            min={new Date().toISOString().split('T')[0]}
             required
           />
         </div>

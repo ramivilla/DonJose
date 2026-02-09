@@ -123,7 +123,6 @@ function VentasTerneros() {
             type="date" 
             value={form.fecha_venta}
             onChange={(e) => setForm({...form, fecha_venta: e.target.value})}
-            min={new Date().toISOString().split('T')[0]}
             required
           />
         </div>
