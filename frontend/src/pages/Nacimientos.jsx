@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatDate } from '../utils/formatNumbers';
 
 function Nacimientos() {
   const [nacimientos, setNacimientos] = useState([]);
@@ -155,7 +156,7 @@ function Nacimientos() {
           <tbody>
             {nacimientos.map((nac) => (
               <tr key={nac.id}>
-                <td>{nac.fecha}</td>
+                <td>{formatDate(nac.fecha)}</td>
                 <td><strong>{nac.dueno}</strong></td>
                 <td>{nac.machos}</td>
                 <td>{nac.hembras}</td>

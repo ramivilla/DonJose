@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { formatCurrency, formatInteger, formatKg, formatPrice } from '../utils/formatNumbers';
+import { formatCurrency, formatInteger, formatKg, formatPrice, formatDate } from '../utils/formatNumbers';
 
 function VentasVacasToros() {
   const [ventas, setVentas] = useState([]);
@@ -227,13 +227,13 @@ function VentasVacasToros() {
             {ventas.map((venta) => (
               <tr key={venta.id}>
                 <td>{venta.tipo}</td>
-                <td>{venta.fecha_venta}</td>
+                <td>{formatDate(venta.fecha_venta)}</td>
                 <td><strong>{venta.dueno}</strong></td>
                 <td>{venta.cantidad}</td>
                 <td>{formatKg(venta.kilos_totales) || '-'}</td>
                 <td>${formatPrice(venta.precio_por_kg) || '-'}</td>
                 <td><strong>${formatCurrency(venta.precio_total)}</strong></td>
-                <td>{venta.fecha_cobro || '-'}</td>
+                <td>{formatDate(venta.fecha_cobro) || '-'}</td>
                 <td>{venta.notas || '-'}</td>
                 <td>
                   <button 
