@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatDate } from '../utils/formatNumbers';
 
 function Muertes() {
   const [muertes, setMuertes] = useState([]);
@@ -179,7 +180,7 @@ function Muertes() {
           <tbody>
             {muertes.map((muerte) => (
               <tr key={muerte.id}>
-                <td>{muerte.fecha}</td>
+                <td>{formatDate(muerte.fecha)}</td>
                 <td><strong>{muerte.dueno}</strong></td>
                 <td>{muerte.tipo_animal}</td>
                 <td>{muerte.cantidad}</td>

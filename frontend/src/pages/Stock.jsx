@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatDate } from '../utils/formatNumbers';
 
 function Stock() {
   const [stock, setStock] = useState([]);
@@ -177,7 +178,7 @@ function Stock() {
                             )}
                           </td>
                           <td style={{ textAlign: 'right', padding: '0.5rem', color: '#666' }}>
-                            {item.fecha_actualizacion}
+                            {formatDate(item.fecha_actualizacion)}
                           </td>
                           <td style={{ textAlign: 'right', padding: '0.5rem' }}>
                             {editando === item.id ? (
