@@ -242,12 +242,16 @@ app.delete('/api/nacimientos/:id', async (req, res) => {
     
     // Restar del stock
     if (machos > 0) {
+      const stockAntesMachos = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]))[0]?.values[0]?.[0] || 0;
       await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
         [machos, 'Terneros', dueno]);
+      await registrarMovimiento('Eliminación nacimiento', 'Terneros', dueno, machos, stockAntesMachos, stockAntesMachos - machos, id, 'Nacimiento eliminado - stock revertido');
     }
     if (hembras > 0) {
+      const stockAntesHembras = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneras', dueno]))[0]?.values[0]?.[0] || 0;
       await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
         [hembras, 'Terneras', dueno]);
+      await registrarMovimiento('Eliminación nacimiento', 'Terneras', dueno, hembras, stockAntesHembras, stockAntesHembras - hembras, id, 'Nacimiento eliminado - stock revertido');
     }
     
     // Eliminar registro
@@ -262,18 +266,17 @@ app.delete('/api/nacimientos/:id', async (req, res) => {
 app.delete('/api/muertes/:id', async (req, res) => {
   const { id } = req.params;
   
-  // Obtener datos de la muerte antes de eliminar
   const result = await db.exec('SELECT tipo_animal, dueno, cantidad FROM muertes WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const tipo_animal = result[0].values[0][0];
     const dueno = result[0].values[0][1];
     const cantidad = result[0].values[0][2];
     
-    // Devolver al stock
+    const stockAntes = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo_animal, dueno]))[0]?.values[0]?.[0] || 0;
     await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, tipo_animal, dueno]);
+    await registrarMovimiento('Eliminación muerte', tipo_animal, dueno, cantidad, stockAntes, stockAntes + cantidad, id, 'Muerte eliminada - stock revertido');
     
-    // Eliminar registro
     await db.run('DELETE FROM muertes WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
@@ -285,17 +288,17 @@ app.delete('/api/muertes/:id', async (req, res) => {
 app.delete('/api/ventas-terneros/:id', async (req, res) => {
   const { id } = req.params;
   
-  // Obtener datos de la venta antes de eliminar
-  const result = await db.exec('SELECT dueno, cantidad FROM ventas_terneros WHERE id = ?', [id]);
+  const result = await db.exec('SELECT dueno, cantidad, tipo FROM ventas_terneros WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const dueno = result[0].values[0][0];
     const cantidad = result[0].values[0][1];
+    const tipo = result[0].values[0][2] || 'Terneros';
     
-    // Devolver al stock
+    const stockAntes = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]))[0]?.values[0]?.[0] || 0;
     await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
-      [cantidad, 'Terneros', dueno]);
+      [cantidad, tipo, dueno]);
+    await registrarMovimiento('Eliminación venta', tipo, dueno, cantidad, stockAntes, stockAntes + cantidad, id, 'Venta eliminada - stock revertido');
     
-    // Eliminar registro
     await db.run('DELETE FROM ventas_terneros WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
@@ -307,18 +310,17 @@ app.delete('/api/ventas-terneros/:id', async (req, res) => {
 app.delete('/api/ventas-vacas-toros/:id', async (req, res) => {
   const { id } = req.params;
   
-  // Obtener datos de la venta antes de eliminar
   const result = await db.exec('SELECT tipo, dueno, cantidad FROM ventas_vacas_toros WHERE id = ?', [id]);
   if (result[0] && result[0].values.length > 0) {
     const tipo = result[0].values[0][0];
     const dueno = result[0].values[0][1];
     const cantidad = result[0].values[0][2];
     
-    // Devolver al stock
+    const stockAntes = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]))[0]?.values[0]?.[0] || 0;
     await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, tipo, dueno]);
+    await registrarMovimiento('Eliminación venta', tipo, dueno, cantidad, stockAntes, stockAntes + cantidad, id, 'Venta eliminada - stock revertido');
     
-    // Eliminar registro
     await db.run('DELETE FROM ventas_vacas_toros WHERE id = ?', [id]);
     saveDB();
     res.json({ success: true });
@@ -350,6 +352,7 @@ app.delete('/api/compras-terneros/:id', async (req, res) => {
     // Restar del stock
     await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, 'Terneros', dueno]);
+    await registrarMovimiento('Eliminación compra', 'Terneros', dueno, cantidad, stockActual, stockActual - cantidad, id, 'Compra eliminada - stock revertido');
     
     // Eliminar registro
     await db.run('DELETE FROM compras_terneros WHERE id = ?', [id]);
@@ -384,6 +387,7 @@ app.delete('/api/compras-vacas-toros/:id', async (req, res) => {
     // Restar del stock
     await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [cantidad, tipo, dueno]);
+    await registrarMovimiento('Eliminación compra', tipo, dueno, cantidad, stockActual, stockActual - cantidad, id, 'Compra eliminada - stock revertido');
     
     // Eliminar registro
     await db.run('DELETE FROM compras_vacas_toros WHERE id = ?', [id]);
