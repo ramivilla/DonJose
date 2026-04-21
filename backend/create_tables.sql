@@ -138,6 +138,20 @@ CREATE TABLE IF NOT EXISTS ventas_cereales (
   notas TEXT
 );
 
+-- Tabla de movimientos (log de auditoría)
+CREATE TABLE IF NOT EXISTS movimientos (
+  id SERIAL PRIMARY KEY,
+  fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  tipo_movimiento TEXT NOT NULL,
+  tipo_animal TEXT NOT NULL,
+  dueno TEXT NOT NULL,
+  cantidad INTEGER NOT NULL,
+  stock_antes INTEGER NOT NULL,
+  stock_despues INTEGER NOT NULL,
+  referencia_id INTEGER,
+  notas TEXT
+);
+
 -- Insertar datos iniciales de stock
 INSERT INTO stock (tipo, dueno, cantidad) VALUES 
 ('Toro', 'Perla', 0),

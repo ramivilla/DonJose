@@ -19,9 +19,43 @@ await initDB().then(database => {
 app.use(cors());
 app.use(express.json());
 
+// Helper para registrar movimientos de stock
+async function registrarMovimiento(tipo_movimiento, tipo_animal, dueno, cantidad, stock_antes, stock_despues, referencia_id = null, notas = '') {
+  try {
+    await db.run(
+      'INSERT INTO movimientos (tipo_movimiento, tipo_animal, dueno, cantidad, stock_antes, stock_despues, referencia_id, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [tipo_movimiento, tipo_animal, dueno, cantidad, stock_antes, stock_despues, referencia_id, notas]
+    );
+  } catch (err) {
+    console.error('Error al registrar movimiento:', err.message);
+  }
+}
+
 // Health check
 app.get('/api/health', async (req, res) => {
   res.json({ status: 'ok', message: 'Don José API funcionando' });
+});
+
+// MOVIMIENTOS (log de auditoría)
+app.get('/api/movimientos', async (req, res) => {
+  try {
+    const result = await db.exec('SELECT * FROM movimientos ORDER BY fecha_hora DESC LIMIT 500');
+    const movimientos = result[0] ? result[0].values.map(row => ({
+      id: row[0],
+      fecha_hora: row[1],
+      tipo_movimiento: row[2],
+      tipo_animal: row[3],
+      dueno: row[4],
+      cantidad: row[5],
+      stock_antes: row[6],
+      stock_despues: row[7],
+      referencia_id: row[8],
+      notas: row[9]
+    })) : [];
+    res.json(movimientos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // DASHBOARD STATS
@@ -111,7 +145,9 @@ app.post('/api/stock', async (req, res) => {
 app.put('/api/stock/ajustar', async (req, res) => {
   const { tipo, dueno, cantidad } = req.body;
   const cantidadNum = parseInt(cantidad);
+  const stockAntes = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]))[0]?.values[0]?.[0] || 0;
   await db.run('UPDATE stock SET cantidad = ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?', [cantidadNum, tipo, dueno]);
+  await registrarMovimiento('Ajuste manual', tipo, dueno, Math.abs(cantidadNum - stockAntes), stockAntes, cantidadNum, null, 'Ajuste manual de stock');
   saveDB();
   res.json({ success: true });
 });
@@ -384,12 +420,16 @@ app.post('/api/nacimientos', async (req, res) => {
   
   // Actualizar stock automáticamente
   if (machosNum > 0) {
+    const stockAntes = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]))[0]?.values[0]?.[0] || 0;
     await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [machosNum, 'Terneros', dueno]);
+    await registrarMovimiento('Nacimiento', 'Terneros', dueno, machosNum, stockAntes, stockAntes + machosNum, null, notas);
   }
   if (hembrasNum > 0) {
+    const stockAntes = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneras', dueno]))[0]?.values[0]?.[0] || 0;
     await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
       [hembrasNum, 'Terneras', dueno]);
+    await registrarMovimiento('Nacimiento', 'Terneras', dueno, hembrasNum, stockAntes, stockAntes + hembrasNum, null, notas);
   }
   
   saveDB();
@@ -463,6 +503,8 @@ app.post('/api/muertes', async (req, res) => {
   // Restar del stock
   await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipo_animal, dueno]);
+  
+  await registrarMovimiento('Muerte', tipo_animal, dueno, cantidadNum, stockActual, stockActual - cantidadNum, null, causa);
   
   saveDB();
   res.json({ success: true });
@@ -561,6 +603,8 @@ app.post('/api/ventas-terneros', async (req, res) => {
   // Restar del stock
   await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipoAnimal, dueno]);
+
+  await registrarMovimiento('Venta', tipoAnimal, dueno, cantidadNum, stockActual, stockActual - cantidadNum, null, notas);
   
   saveDB();
   res.json({ success: true });
@@ -594,8 +638,10 @@ app.post('/api/compras-terneros', async (req, res) => {
     [fecha_compra, dueno, cantidadNum, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas]);
   
   // Sumar al stock de Terneros
+  const stockAntesCT = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', ['Terneros', dueno]))[0]?.values[0]?.[0] || 0;
   await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, 'Terneros', dueno]);
+  await registrarMovimiento('Compra', 'Terneros', dueno, cantidadNum, stockAntesCT, stockAntesCT + cantidadNum, null, notas);
   
   saveDB();
   res.json({ success: true });
@@ -642,6 +688,8 @@ app.post('/api/ventas-vacas-toros', async (req, res) => {
   // Restar del stock
   await db.run('UPDATE stock SET cantidad = cantidad - ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipo, dueno]);
+
+  await registrarMovimiento('Venta', tipo, dueno, cantidadNum, stockActual, stockActual - cantidadNum, null, notas);
   
   saveDB();
   res.json({ success: true });
@@ -676,17 +724,14 @@ app.post('/api/compras-vacas-toros', async (req, res) => {
   await db.run('INSERT INTO compras_vacas_toros (tipo, fecha_compra, dueno, proveedor, cantidad, kilos_por_animal, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [tipo, fecha_compra, dueno, proveedor, cantidadNum, null, kilos_totales, precio_por_kg, precio_total, fecha_pago, notas]);
   
-  // Verificar stock antes
-  const stockAntes = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
-  console.log('Stock antes:', stockAntes[0]?.values[0]?.[0] || 'No encontrado', 'para tipo:', tipo, 'dueno:', dueno);
+  // Verificar stock antes y sumar
+  const stockAntesVT = (await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]))[0]?.values[0]?.[0] || 0;
   
   // Sumar al stock
   await db.run('UPDATE stock SET cantidad = cantidad + ?, fecha_actualizacion = CURRENT_TIMESTAMP WHERE tipo = ? AND dueno = ?',
     [cantidadNum, tipo, dueno]);
-  
-  // Verificar stock después
-  const stockDespues = await db.exec('SELECT cantidad FROM stock WHERE tipo = ? AND dueno = ?', [tipo, dueno]);
-  console.log('Stock después:', stockDespues[0]?.values[0]?.[0] || 'No encontrado');
+
+  await registrarMovimiento('Compra', tipo, dueno, cantidadNum, stockAntesVT, stockAntesVT + cantidadNum, null, notas);
   
   saveDB();
   res.json({ success: true });
