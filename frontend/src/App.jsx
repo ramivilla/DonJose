@@ -12,6 +12,7 @@ import ComprasVacasToros from './pages/ComprasVacasToros';
 import EstadisticasNacimientosMuertes from './pages/EstadisticasNacimientosMuertes';
 import EstadisticasVentasCompras from './pages/EstadisticasVentasCompras';
 import Login from './pages/Login';
+import Movimientos from './pages/Movimientos';
 import './App.css';
 
 // Componente para el menú desplegable
@@ -78,6 +79,9 @@ function Navigation({ currentUser, onLogout }) {
         
         <Link to="/stock" className={location.pathname === '/stock' ? 'active' : ''}>
           Stock
+        </Link>
+        <Link to="/movimientos" className={location.pathname === '/movimientos' ? 'active' : ''}>
+          Movimientos
         </Link>
         
         <span style={{ 
@@ -158,6 +162,7 @@ function App() {
               <Route path="/estadisticas-nacimientos-muertes" element={<EstadisticasNacimientosMuertes />} />
               <Route path="/estadisticas-ventas-compras" element={<EstadisticasVentasCompras />} />
               <Route path="/stock" element={<Stock />} />
+              <Route path="/movimientos" element={<Movimientos />} />
             </Routes>
           </main>
           <footer style={{
