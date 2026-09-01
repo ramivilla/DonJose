@@ -113,25 +113,7 @@ function NacimientosEstadisticas() {
                 );
               })}
             </tbody>
-            <tfoot>
-              <tr style={{ background: '#e8f5e9', fontWeight: 'bold' }}>
-                <td style={{ textAlign: 'center' }}>Totales</td>
-                {DUENOS.map(dueno => {
-                  const totalMachos = porDueno.filter(d => d.dueno === dueno).reduce((s, d) => s + d.machos, 0);
-                  const totalHembras = porDueno.filter(d => d.dueno === dueno).reduce((s, d) => s + d.hembras, 0);
-                  return (
-                    <>
-                      <td key={`${dueno}-tm`} style={{ textAlign: 'center', borderLeft: '2px solid #dee2e6' }}>{totalMachos}</td>
-                      <td key={`${dueno}-th`} style={{ textAlign: 'center' }}>{totalHembras}</td>
-                      <td key={`${dueno}-tt`} style={{ textAlign: 'center' }}>{totalMachos + totalHembras}</td>
-                    </>
-                  );
-                })}
-                <td style={{ textAlign: 'center', borderLeft: '2px solid #dee2e6' }}>{anios.reduce((s, a) => s + a.machos, 0)}</td>
-                <td style={{ textAlign: 'center' }}>{anios.reduce((s, a) => s + a.hembras, 0)}</td>
-                <td style={{ textAlign: 'center', color: '#2c5f2d', fontSize: '1.1rem' }}>{anios.reduce((s, a) => s + a.total, 0)}</td>
-              </tr>
-            </tfoot>
+
           </table>
         </div>
       )}
