@@ -443,17 +443,17 @@ app.post('/api/nacimientos', async (req, res) => {
 app.get('/api/nacimientos/stats', async (req, res) => {
   const result = await db.exec(`
     SELECT 
-      strftime('%Y', fecha) as anio,
+      EXTRACT(YEAR FROM fecha)::text as anio,
       SUM(machos) as machos,
       SUM(hembras) as hembras,
       SUM(machos + hembras) as total
     FROM nacimientos
-    GROUP BY strftime('%Y', fecha)
+    GROUP BY 1
     ORDER BY anio DESC
   `);
   
   // Obtener total de vacas actual (suma de todos los dueños)
-  const stockResult = await db.exec('SELECT SUM(cantidad) as total FROM stock WHERE tipo = "Vacas"');
+  const stockResult = await db.exec('SELECT SUM(cantidad) as total FROM stock WHERE tipo = $1', ['Vacas']);
   const vacasTotales = stockResult[0]?.values[0]?.[0] || 1;
   
   const stats = result[0] ? result[0].values.map(row => ({
@@ -466,6 +466,55 @@ app.get('/api/nacimientos/stats', async (req, res) => {
   })) : [];
   
   res.json(stats);
+});
+
+// Stats de nacimientos por año Y por dueño
+app.get('/api/nacimientos/stats-detalle', async (req, res) => {
+  try {
+    // Totales por año
+    const porAnio = await db.exec(`
+      SELECT 
+        EXTRACT(YEAR FROM fecha)::text as anio,
+        SUM(machos) as machos,
+        SUM(hembras) as hembras,
+        SUM(machos + hembras) as total
+      FROM nacimientos
+      GROUP BY 1
+      ORDER BY anio DESC
+    `);
+
+    // Por año y dueño
+    const porDueno = await db.exec(`
+      SELECT 
+        EXTRACT(YEAR FROM fecha)::text as anio,
+        dueno,
+        SUM(machos) as machos,
+        SUM(hembras) as hembras,
+        SUM(machos + hembras) as total
+      FROM nacimientos
+      GROUP BY 1, dueno
+      ORDER BY anio DESC, dueno
+    `);
+
+    const anios = porAnio[0] ? porAnio[0].values.map(row => ({
+      anio: row[0],
+      machos: row[1],
+      hembras: row[2],
+      total: row[3]
+    })) : [];
+
+    const porDuenoData = porDueno[0] ? porDueno[0].values.map(row => ({
+      anio: row[0],
+      dueno: row[1],
+      machos: row[2],
+      hembras: row[3],
+      total: row[4]
+    })) : [];
+
+    res.json({ anios, porDueno: porDuenoData });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // MUERTES
