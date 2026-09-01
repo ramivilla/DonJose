@@ -13,6 +13,7 @@ import EstadisticasNacimientosMuertes from './pages/EstadisticasNacimientosMuert
 import EstadisticasVentasCompras from './pages/EstadisticasVentasCompras';
 import Login from './pages/Login';
 import Movimientos from './pages/Movimientos';
+import NacimientosEstadisticas from './pages/NacimientosEstadisticas';
 import './App.css';
 
 // Componente para el menú desplegable
@@ -44,6 +45,7 @@ function Navigation({ currentUser, onLogout }) {
   const isVentasActive = ['/ventas-terneros', '/ventas-vacas-toros', '/ventas-cereales'].includes(location.pathname);
   const isComprasActive = ['/compras-vacas-toros'].includes(location.pathname);
   const isEstadisticasActive = ['/estadisticas-nacimientos-muertes', '/estadisticas-ventas-compras'].includes(location.pathname);
+  const isNacimientosActive = ['/nacimientos', '/nacimientos-estadisticas'].includes(location.pathname);
 
   return (
     <nav className="navbar">
@@ -55,9 +57,12 @@ function Navigation({ currentUser, onLogout }) {
         <Link to="/mapa" className={location.pathname === '/mapa' ? 'active' : ''}>
           Mapa
         </Link>
-        <Link to="/nacimientos" className={location.pathname === '/nacimientos' ? 'active' : ''}>
-          Nacimientos
-        </Link>
+
+        <DropdownMenu title="Nacimientos" isActive={isNacimientosActive}>
+          <Link to="/nacimientos">Registro</Link>
+          <Link to="/nacimientos-estadisticas">Estadísticas</Link>
+        </DropdownMenu>
+
         <Link to="/muertes" className={location.pathname === '/muertes' ? 'active' : ''}>
           Muertes
         </Link>
@@ -154,6 +159,7 @@ function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/mapa" element={<Mapa />} />
               <Route path="/nacimientos" element={<Nacimientos />} />
+              <Route path="/nacimientos-estadisticas" element={<NacimientosEstadisticas />} />
               <Route path="/muertes" element={<Muertes />} />
               <Route path="/ventas-terneros" element={<VentasTerneros />} />
               <Route path="/ventas-vacas-toros" element={<VentasVacasToros />} />
