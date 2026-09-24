@@ -41,12 +41,11 @@ npm install pg dotenv
 ```
 
 ### 3. **Variables de Entorno**
-Crear/actualizar `.env` con tus datos de Supabase:
+Crear `.env` en la carpeta `backend/` basándote en `.env.example`:
 ```env
-# Supabase Connection (ya configurado en database.js)
-SUPABASE_HOST=***REMOVED***
-SUPABASE_USER=postgres.***REMOVED***
-SUPABASE_PASSWORD=***REMOVED***
+SUPABASE_HOST=tu_host.pooler.supabase.com
+SUPABASE_USER=postgres.tu_project_ref
+SUPABASE_PASSWORD=tu_password
 SUPABASE_DATABASE=postgres
 SUPABASE_PORT=6543
 ```
